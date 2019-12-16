@@ -1,6 +1,6 @@
 package com.harpserg.tasks;
 
-import com.google.gson.*;
+import com.google.gson.JsonSyntaxException;
 import com.harpserg.tasks.dto.AccountFullDTO;
 import com.harpserg.tasks.dto.AccountShortDTO;
 import com.harpserg.tasks.dto.MoneyTransferDTO;

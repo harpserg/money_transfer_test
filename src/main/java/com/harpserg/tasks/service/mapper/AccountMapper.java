@@ -10,13 +10,13 @@ import org.mapstruct.Mappings;
 @Mapper
 public interface AccountMapper {
 
-    @Mappings({@Mapping(target="balance.cents", source = "balance")})
+    @Mappings({@Mapping(target = "balance.cents", source = "balance")})
     AccountFullDTO fromEntity(Account account);
 
-    @Mappings({@Mapping(target="balance", source = "balance.cents")})
+    @Mappings({@Mapping(target = "balance", source = "balance.cents")})
     Account toEntity(AccountFullDTO accountFullDTO);
 
-    @Mappings({@Mapping(target="balance", source = "balance.cents")})
+    @Mappings({@Mapping(target = "balance", source = "balance.cents")})
     Account toEntity(AccountShortDTO accountDTO);
 
 }

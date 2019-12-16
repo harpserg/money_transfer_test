@@ -84,7 +84,7 @@ public class MoneyTransferTest extends BaseTest {
         assertEquals(fromStartBalance - transfersCount * transferAmount, accountService.getAccount(fromId).getBalance().getCents());
         assertEquals(toStartBalance + transfersCount * transferAmount, accountService.getAccount(toId).getBalance().getCents());
 
-        accountService.getAllAccounts().forEach(account -> log.info(account.getOwnerName() + " - " + account.getBalance()));
+        accountService.getAllAccounts().forEach(account -> log.info(account.getOwnerName() + " - " + account.getBalance().getCents()));
         accountService.deleteAll();
     }
 
@@ -157,7 +157,7 @@ public class MoneyTransferTest extends BaseTest {
             assertEquals(entry.getValue(), finishBalance.get(entry.getKey()));
         }
 
-        accountService.getAllAccounts().forEach(account -> log.info(account.getOwnerName() + " - " + account.getBalance()));
+        accountService.getAllAccounts().forEach(account -> log.info(account.getOwnerName() + " - " + account.getBalance().getCents()));
         accountService.deleteAll();
     }
 
