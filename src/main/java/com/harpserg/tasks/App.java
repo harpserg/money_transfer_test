@@ -21,8 +21,7 @@ import java.util.UUID;
 
 import static com.harpserg.tasks.converter.GsonConverter.gson;
 import static com.harpserg.tasks.util.ControllerUtils.generateUri;
-import static spark.Spark.get;
-import static spark.Spark.post;
+import static spark.Spark.*;
 
 public class App {
 
@@ -62,26 +61,8 @@ public class App {
 
         post("/money/transfer", (request, response) -> {
             response.type("application/json");
-            try {
-                MoneyTransferDTO moneyTransferDTO = gson.fromJson(request.body(), MoneyTransferDTO.class);
-                moneyService.transferMoney(moneyTransferDTO);
-            } catch (AccountNotFoundException e) {
-                response.status(HttpStatus.NOT_FOUND_404);
-                return e.getMessage();
-            } catch (InsufficientFundsException e) {
-                response.status(HttpStatus.PAYMENT_REQUIRED_402);
-                return e.getMessage();
-            } catch (MoneyTransferConflictException e) {
-                response.status(HttpStatus.SERVICE_UNAVAILABLE_503);
-                return e.getMessage();
-            } catch (JsonSyntaxException | BadRequestException | IllegalArgumentException e) {
-                response.status(HttpStatus.BAD_REQUEST_400);
-                return e.getMessage();
-            } catch (RuntimeException e) {
-                response.status(HttpStatus.INTERNAL_SERVER_ERROR_500);
-                return "Internal server error!";
-            }
-
+            MoneyTransferDTO moneyTransferDTO = gson.fromJson(request.body(), MoneyTransferDTO.class);
+            moneyService.transferMoney(moneyTransferDTO);
             response.status(HttpStatus.NO_CONTENT_204);
             return "";
         });
@@ -89,6 +70,43 @@ public class App {
         get("/status", (request, response) -> {
             response.status(HttpStatus.OK_200);
             return "ok";
+        });
+
+        /*EXCEPTIONS HANDLING*/
+
+        exception(AccountNotFoundException.class, (e, request, response) -> {
+            response.status(HttpStatus.NOT_FOUND_404);
+            response.body(e.getMessage());
+        });
+
+        exception(InsufficientFundsException.class, (e, request, response) -> {
+            response.status(HttpStatus.PAYMENT_REQUIRED_402);
+            response.body(e.getMessage());
+        });
+
+        exception(MoneyTransferConflictException.class, (e, request, response) -> {
+            response.status(HttpStatus.SERVICE_UNAVAILABLE_503);
+            response.body(e.getMessage());
+        });
+
+        exception(JsonSyntaxException.class, (e, request, response) -> {
+            response.status(HttpStatus.BAD_REQUEST_400);
+            response.body(e.getMessage());
+        });
+
+        exception(BadRequestException.class, (e, request, response) -> {
+            response.status(HttpStatus.BAD_REQUEST_400);
+            response.body(e.getMessage());
+        });
+
+        exception(IllegalArgumentException.class, (e, request, response) -> {
+            response.status(HttpStatus.BAD_REQUEST_400);
+            response.body(e.getMessage());
+        });
+
+        exception(RuntimeException.class, (e, request, response) -> {
+            response.status(HttpStatus.INTERNAL_SERVER_ERROR_500);
+            response.body(e.getMessage());
         });
 
     }
