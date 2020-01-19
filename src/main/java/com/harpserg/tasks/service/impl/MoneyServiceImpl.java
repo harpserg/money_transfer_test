@@ -58,7 +58,7 @@ public final class MoneyServiceImpl implements MoneyService {
                 Account to = accounts.get(0).getId().equals(moneyTransferDTO.getTo()) ? accounts.get(0) : accounts.get(1);
 
                 if (from.getBalance() < moneyTransferDTO.getAmount().getCents())
-                    throw new InsufficientFundsException(String.format("Account %s has insufficient funds: expected %d, available %d", from.getId(), from.getBalance(), moneyTransferDTO.getAmount()));
+                    throw new InsufficientFundsException(String.format("Account %s has insufficient funds: expected %d, available %d", from.getId(), from.getBalance(), moneyTransferDTO.getAmount().getCents()));
 
                 from.setBalance(from.getBalance() - moneyTransferDTO.getAmount().getCents());
                 to.setBalance(to.getBalance() + moneyTransferDTO.getAmount().getCents());

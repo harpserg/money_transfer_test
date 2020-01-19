@@ -2,10 +2,10 @@ package com.harpserg.tasks.component;
 
 
 import com.github.javafaker.Faker;
+import com.harpserg.tasks.component.helper.TestHelper;
 import com.harpserg.tasks.dto.AccountFullDTO;
 import com.harpserg.tasks.dto.AccountShortDTO;
 import com.harpserg.tasks.dto.Money;
-import com.harpserg.tasks.dto.MoneyTransferDTO;
 import com.harpserg.tasks.service.AccountService;
 import com.harpserg.tasks.service.impl.AccountServiceImpl;
 import com.harpserg.tasks.service.impl.MoneyServiceImpl;
@@ -16,13 +16,15 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
-import static com.harpserg.tasks.converter.GsonConverter.gson;
+import static com.harpserg.tasks.component.helper.TestHelper.createMoneyTransferRequest;
+import static com.harpserg.tasks.component.helper.TestHelper.getRandomNumberInRange;
 import static org.junit.Assert.assertEquals;
 
 public class MoneyTransferTest extends BaseTest {
@@ -31,6 +33,115 @@ public class MoneyTransferTest extends BaseTest {
     private SessionFactory factory = new Configuration().configure().buildSessionFactory();
     private AccountService accountService = new AccountServiceImpl(factory);
     Faker faker = new Faker();
+
+    @Test
+    public void transferUnknownAccount_ShouldReturnNotFoundHeader() throws IOException {
+        Request request = createMoneyTransferRequest(UUID.randomUUID(), UUID.randomUUID(), 100);
+
+        Call call = httpClient.newCall(request);
+        Response response = call.execute();
+
+        assertEquals(404, response.code());
+    }
+
+    @Test
+    public void unknownEndpointCall_ShouldReturnNotFoundHeader() throws IOException {
+        String transferRequest = "{\"someData\":\"some data value\"}";
+
+        RequestBody body = RequestBody.create(transferRequest, MediaType.parse("application/json"));
+
+        Request request = new Request.Builder()
+                .url(TestHelper.REST_API_BASE + "/money/unknown_endpoint")
+                .post(body)
+                .build();
+
+        Call call = httpClient.newCall(request);
+        Response response = call.execute();
+
+        assertEquals(404, response.code());
+    }
+
+    @Test
+    public void transferRequestWithInvalidJsonPayload_ShouldReturnBadRequestHeader() throws IOException {
+        String transferRequest = "{invalidData}";
+
+        RequestBody body = RequestBody.create(transferRequest, MediaType.parse("application/json"));
+
+        Request request = new Request.Builder()
+                .url(TestHelper.REST_API_BASE + "/money/transfer")
+                .post(body)
+                .build();
+
+        Call call = httpClient.newCall(request);
+        Response response = call.execute();
+
+        assertEquals(400, response.code());
+    }
+
+    @Test
+    public void transferWithNegativeAmountValue_ShouldReturnBadRequestHeader() throws IOException {
+
+        AccountShortDTO from = new AccountShortDTO();
+        from.setBalance(new Money(100));
+        from.setOwnerName(faker.name().fullName());
+        UUID fromUUID = accountService.addAccount(from).getId();
+
+        AccountShortDTO to = new AccountShortDTO();
+        to.setBalance(new Money(100));
+        to.setOwnerName(faker.name().fullName());
+        UUID toUUID = accountService.addAccount(to).getId();
+
+        Request request = createMoneyTransferRequest(fromUUID, toUUID, -20);
+
+        Call call = httpClient.newCall(request);
+        Response response = call.execute();
+
+        assertEquals(400, response.code());
+    }
+
+    @Test
+    public void transferWithoutEnoughFunds_ShouldReturnPaymentRequiredHeader() throws IOException {
+        AccountShortDTO from = new AccountShortDTO();
+        from.setBalance(new Money(100));
+        from.setOwnerName(faker.name().fullName());
+        UUID fromUUID = accountService.addAccount(from).getId();
+
+        AccountShortDTO to = new AccountShortDTO();
+        to.setBalance(new Money(100));
+        to.setOwnerName(faker.name().fullName());
+        UUID toUUID = accountService.addAccount(to).getId();
+
+        Request request = createMoneyTransferRequest(fromUUID, toUUID, 200);
+
+        Call call = httpClient.newCall(request);
+        Response response = call.execute();
+
+        assertEquals(402, response.code());
+    }
+
+    @Test
+    public void transferAllAvailableMoney_ShouldBePositive() throws IOException {
+        final long availableAmount = 100;
+
+        AccountShortDTO from = new AccountShortDTO();
+        from.setBalance(new Money(availableAmount));
+        from.setOwnerName(faker.name().fullName());
+        UUID fromUUID = accountService.addAccount(from).getId();
+
+        AccountShortDTO to = new AccountShortDTO();
+        to.setBalance(new Money(0));
+        to.setOwnerName(faker.name().fullName());
+        UUID toUUID = accountService.addAccount(to).getId();
+
+        Request request = createMoneyTransferRequest(fromUUID, toUUID, availableAmount);
+
+        Call call = httpClient.newCall(request);
+        Response response = call.execute();
+
+        assertEquals(204, response.code());
+        assertEquals(0, accountService.getAccount(fromUUID).getBalance().getCents());
+        assertEquals(availableAmount, accountService.getAccount(toUUID).getBalance().getCents());
+    }
 
     @Test
     public void transfersTwoAccountsOneDirection_ShouldNotBlock_ShouldKeepConstantTotalAmount_ShouldHaveConsistentState() throws InterruptedException {
@@ -58,22 +169,7 @@ public class MoneyTransferTest extends BaseTest {
         long toStartBalance = accountService.getAccount(toId).getBalance().getCents();
 
         for (int i = 0; i < transfersCount; i++) {
-
-            String transferRequest = gson.toJson(MoneyTransferDTO.builder()
-                    .from(fromId)
-                    .to(toId)
-                    .amount(new Money(transferAmount))
-                    .build());
-
-            RequestBody body = RequestBody.create(transferRequest, MediaType.parse("application/json"));
-
-            Request request = new Request.Builder()
-                    .url(REST_API_BASE + "/money/transfer")
-                    .post(body)
-                    .build();
-
-            Call call = httpClient.newCall(request);
-
+            Call call = httpClient.newCall(createMoneyTransferRequest(fromId, toId, transferAmount));
             requests.add(() -> call.execute());
         }
 
@@ -128,20 +224,7 @@ public class MoneyTransferTest extends BaseTest {
                 expectedBalance.put(to, expectedBalance.get(to) + amount);
             }
 
-            String transferRequest = gson.toJson(MoneyTransferDTO.builder()
-                    .from(from)
-                    .to(to)
-                    .amount(new Money(amount))
-                    .build());
-
-            RequestBody body = RequestBody.create(transferRequest, MediaType.parse("application/json"));
-
-            Request request = new Request.Builder()
-                    .url(REST_API_BASE + "/money/transfer")
-                    .post(body)
-                    .build();
-
-            Call call = httpClient.newCall(request);
+            Call call = httpClient.newCall(createMoneyTransferRequest(from, to, amount));
 
             requests.add(() -> call.execute());
         }
@@ -161,11 +244,5 @@ public class MoneyTransferTest extends BaseTest {
         accountService.deleteAll();
     }
 
-    private static int getRandomNumberInRange(int min, int max) {
-        if (min >= max) {
-            throw new IllegalArgumentException("max must be greater than min");
-        }
-        Random r = new Random();
-        return r.nextInt((max - min) + 1) + min;
-    }
+
 }

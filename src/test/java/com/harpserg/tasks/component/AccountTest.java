@@ -1,6 +1,7 @@
 package com.harpserg.tasks.component;
 
 
+import com.harpserg.tasks.component.helper.TestHelper;
 import com.harpserg.tasks.dto.AccountFullDTO;
 import com.harpserg.tasks.dto.AccountShortDTO;
 import com.harpserg.tasks.dto.Money;
@@ -25,7 +26,7 @@ public class AccountTest extends BaseTest {
         RequestBody body = RequestBody.create(gson.toJson(accountShortDTO), MediaType.parse("application/json"));
 
         Request request = new Request.Builder()
-                .url(REST_API_BASE + "/account")
+                .url(TestHelper.REST_API_BASE + "/account")
                 .post(body)
                 .build();
 
